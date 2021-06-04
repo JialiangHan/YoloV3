@@ -2,8 +2,7 @@
 this file include a class for upsampling, include:
 1. nearest interpolation
 2. bilinear interpolation
-3. bicubic interpolation
-4. transpose convolution
+
 """
 import math
 
