@@ -31,6 +31,10 @@ def convDW():
     this is the depthwise convolution
     """
 
+def convPW():
+    """
+    this is the pointwise convolution
+    """
 
 def resisual_block():
     """
