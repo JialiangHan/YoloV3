@@ -163,7 +163,7 @@ def channel_shuffle(input_data, group=4):
     return x
 
 
-def resisual_block(input_data, input_channel, filter_num1, filter_num2, filter_num3, trainable, name):
+def residual_block(input_data, input_channel, filter_num1, filter_num2, filter_num3, trainable, name):
     """
     this is the network unit in figure 4(d) in paper
     """
