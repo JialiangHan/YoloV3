@@ -4,6 +4,7 @@ import tensorflow as tf
 def conv2d(input_data, filters_shape, trainable, name, downsample=False, activate=False, bn=False):
     """
     this is the traditional convolution
+    input_data:[batch size, rows,cols, channels]
     """
     with tf.varable_scope(name):
         if downsample:
@@ -94,7 +95,89 @@ def convPW(input_data, output_channels, trainable, name, activate=False, bn=Fals
     return conv
 
 
-def resisual_block():
+def conDW_group(input_data, filters_shape, trainable, name, group=4, activate=False, bn=False):
+    """
+    this is depthwise convolution with group
+    """
+    with tf.varable_scope(name):
+        strides = (1, 1, 1, 1)
+        padding = "SAME"
+        kernel_size = filters_shape[0]
+        filters_shape_dw = (kernel_size, kernel_size, input_data[-1], 1)
+        weight = tf.get_variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape_dw,
+                                 initializer=tf.random_normal_initializer(stddev=0.01))
+        input_groups = tf.split(value=input_data, num_or_size_splits=group, axis=3)
+        weight_groups = tf.split(value=weight, num_or_size_splits=group, axis=3)
+        groupConv = lambda i, k: tf.nn.depthwise_conv2d(i, k, strides=strides, padding=padding)
+        conv = [groupConv(i, k) for i, k in zip(input_groups, weight_groups)]
+        conv = tf.concat(conv, axis=3)
+        if bn:
+            conv = tf.keras.layers.batch_normalization(conv, training=trainable)
+        else:
+            bias = tf.get_variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
+                                   initializer=tf.constant_initializer(0.0))
+            conv = tf.nn.bias_add(bias)
+
+        if activate:
+            conv = tf.nn.relu(conv)
+
+    return conv
+
+
+def conPW_group(input_data, output_channels, trainable, name, group=4, activate=False, bn=False):
+    """
+    this is the pointwise convolution with group
+    """
+    with tf.varable_scope(name):
+        strides = (1, 1, 1, 1)
+        padding = "SAME"
+        filters_shape = (1, 1, input_data[-1], output_channels)
+
+        weight = tf.get_variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
+                                 initializer=tf.random_normal_initializer(stddev=0.01))
+        input_groups = tf.split(value=input_data, num_or_size_splits=group, axis=3)
+        weight_groups = tf.split(value=weight, num_or_size_splits=group, axis=3)
+        groupConv = lambda i, k: tf.nn.conv2d(i, k, strides=strides, padding=padding)
+        conv = [groupConv(i, k) for i, k in zip(input_groups, weight_groups)]
+        conv = tf.concat(conv, axis=3)
+        if bn:
+            conv = tf.keras.layers.batch_normalization(conv, training=trainable)
+        else:
+            bias = tf.get_variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
+                                   initializer=tf.constant_initializer(0.0))
+            conv = tf.nn.bias_add(bias)
+
+        if activate:
+            conv = tf.nn.relu(conv)
+
+    return conv
+
+
+def channel_shuffle(input_data, group=4):
+    channel_num = input_data.shape[-1]
+    if channel_num % group != 0:
+        raise ValueError("The group must be divisible by the shape of the last dimension of the input_data.")
+    x = tf.reshape(input_data, shape=(-1, input_data.shape[1], input_data.shape[2], group, channel_num // group))
+    x = tf.transpose(x, perm=[0, 1, 2, 4, 3])
+    x = tf.reshape(x, shape=(-1, input_data.shape[1], input_data.shape[2], channel_num))
+    return x
+
+
+def resisual_block(input_data, input_channel, filter_num1, filter_num2, filter_num3, trainable, name):
     """
     this is the network unit in figure 4(d) in paper
     """
+    short_cut = input_data
+
+    with tf.variable_scope(name):
+        input_data = conPW_group(input_data, filter_num1, trainable=trainable, name='conv1', group=4, activate=True,
+                                 bn=True)
+        input_data = channel_shuffle(input_data)
+        input_data = conDW_group(input_data, filters_shape=(3, 3, input_channel, filter_num2),
+                                 trainable=trainable, name='conv2', group=4, bn=True, activate=False)
+        input_data = conPW_group(input_data, filter_num3, trainable=trainable, name='conv3', group=4, activate=False,
+                                 bn=False)
+        residual_output = input_data + short_cut
+        residual_output = tf.nn.relu(residual_output)
+
+    return residual_output
