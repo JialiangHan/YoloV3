@@ -1,5 +1,6 @@
 import common
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.compat.v1.disable_eager_execution()
 
 
 def backbone(input_data, trainable):
