@@ -1,10 +1,9 @@
 import common
-import tensorflow.compat.v1 as tf
-tf.compat.v1.disable_eager_execution()
+import tensorflow as tf
 
 
 def backbone(input_data, trainable):
-    with tf.variable_scope('backbone'):
+    with tf.compat.v1.variable_scope('backbone'):
 
         input_data = common.conv2d(input_data, filters_shape=(3, 3, 3, 32), trainable=trainable, name='conv0')
         input_data = common.conv_Depthwise_seperatable(input_data, filters_shape=(3, 3, 32, 16),
