@@ -5,6 +5,7 @@ def conv2d(input_data, filters_shape, trainable, name, downsample=False, activat
     """
     this is the traditional convolution
     input_data:[batch size, rows,cols, channels]
+    ters_shape:[kernel_size,kernel_size,input_channel,output_channel]
     """
     with tf.compat.v1.variable_scope(name):
         if downsample:
@@ -22,7 +23,7 @@ def conv2d(input_data, filters_shape, trainable, name, downsample=False, activat
         conv = tf.nn.conv2d(input=input_data, filters=weight, strides=strides, padding=padding)
 
         if bn:
-            conv = tf.keras.layers.BatchNormalization(conv, training=trainable)
+            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
         else:
             bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
                                initial_value=tf.zeros(filters_shape[-1]))
@@ -34,7 +35,8 @@ def conv2d(input_data, filters_shape, trainable, name, downsample=False, activat
     return conv
 
 
-def conv_Depthwise_seperatable(input_data, filters_shape, trainable, name, downsample=False, activate=False, bn=False,pointwise=True):
+def conv_Depthwise_seperatable(input_data, filters_shape, trainable, name, downsample=False, activate=False, bn=False,
+                               pointwise=True):
     """
     this is the depthwise seperable convolution, block in figure 4(e)
     """
@@ -50,13 +52,13 @@ def conv_Depthwise_seperatable(input_data, filters_shape, trainable, name, downs
             padding = "SAME"
         output_channels = filters_shape[-1]
         kernel_size = filters_shape[0]
-        filters_shape_dw = (kernel_size, kernel_size, input_data.shape[-1].value, 1)
+        filters_shape_dw = (kernel_size, kernel_size, input_data.shape[-1], 1)
         weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape_dw,
                              initial_value=tf.random.normal(filters_shape_dw, stddev=0.01))
         conv = tf.nn.depthwise_conv2d(input=input_data, filter=weight, strides=strides, padding=padding)
 
         if bn:
-            conv = tf.keras.layers.BatchNormalization()(conv, training=trainable)
+            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
         else:
             bias = tf.Variable(name='bias', shape=filters_shape_dw[-2], trainable=True, dtype=tf.float32,
                                initial_value=tf.zeros(filters_shape_dw[-2]))
@@ -78,13 +80,13 @@ def convPW(input_data, output_channels, trainable, name, activate=False, bn=Fals
     with tf.compat.v1.variable_scope(name):
         strides = (1, 1, 1, 1)
         padding = "SAME"
-        filters_shape = (1, 1, input_data.shape[-1].value, output_channels)
+        filters_shape = (1, 1, input_data.shape[-1], output_channels)
         weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
                              initial_value=tf.random.normal(filters_shape, stddev=0.01))
         conv = tf.nn.conv2d(input=input_data, filters=weight, strides=strides, padding=padding)
 
         if bn:
-            conv = tf.keras.layers.BatchNormalization()(conv,training=trainable)
+            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
         else:
             bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
                                initial_value=tf.zeros(filters_shape[-1]))
@@ -96,35 +98,6 @@ def convPW(input_data, output_channels, trainable, name, activate=False, bn=Fals
     return conv
 
 
-# def conDW_group(input_data, filters_shape, trainable, name, group=4, activate=False, bn=False):
-#     """
-#     this is depthwise convolution with group
-#     """
-#     with tf.compat.v1.variable_scope(name):
-#         strides = (1, 1, 1, 1)
-#         padding = "SAME"
-#         kernel_size = filters_shape[0]
-#         filters_shape_dw = (kernel_size, kernel_size, input_data.shape[-1].value, 1)
-#         weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape_dw,
-#                              initial_value=tf.random.normal(filters_shape_dw, stddev=0.01))
-#         input_groups = tf.split(value=input_data, num_or_size_splits=group, axis=3)
-#         weight_groups = tf.split(value=weight, num_or_size_splits=group, axis=3)
-#         groupConv = lambda i, k: tf.nn.depthwise_conv2d(i, k, strides=strides, padding=padding)
-#         conv = [groupConv(i, k) for i, k in zip(input_groups, weight_groups)]
-#         conv = tf.concat(conv, axis=3)
-#         if bn:
-#             conv = tf.keras.layers.BatchNormalization()(conv,training=trainable)
-#         else:
-#             bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
-#                                initial_value=tf.zeros(filters_shape[-1]))
-#             conv = tf.nn.bias_add(conv, bias)
-#
-#         if activate:
-#             conv = tf.nn.relu(conv)
-#
-#     return conv
-
-
 def conPW_group(input_data, output_channels, trainable, name, group=4, activate=False, bn=False):
     """
     this is the pointwise convolution with group
@@ -132,7 +105,7 @@ def conPW_group(input_data, output_channels, trainable, name, group=4, activate=
     with tf.compat.v1.variable_scope(name):
         strides = (1, 1, 1, 1)
         padding = "SAME"
-        filters_shape = (1, 1, int(input_data.shape[-1].value/group), output_channels)
+        filters_shape = (1, 1, int(input_data.shape[-1] / group), output_channels)
 
         weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
                              initial_value=tf.random.normal(filters_shape, stddev=0.01))
@@ -142,7 +115,7 @@ def conPW_group(input_data, output_channels, trainable, name, group=4, activate=
         conv = [groupConv(i, k) for i, k in zip(input_groups, weight_groups)]
         conv = tf.concat(conv, axis=3)
         if bn:
-            conv = tf.keras.layers.BatchNormalization()(conv, training=trainable)
+            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
         else:
             bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
                                initial_value=tf.zeros(filters_shape[-1]))
@@ -175,10 +148,28 @@ def residual_block(input_data, input_channel, filter_num1, filter_num2, filter_n
                                  bn=True)
         input_data = channel_shuffle(input_data)
         input_data = conv_Depthwise_seperatable(input_data, filters_shape=(3, 3, input_channel, filter_num2),
-                                 trainable=trainable, name='conv2', bn=True, activate=False,pointwise=False)
+                                                trainable=trainable, name='conv2', bn=True, activate=False,
+                                                pointwise=False)
         input_data = conPW_group(input_data, filter_num3, trainable=trainable, name='conv3', group=4, activate=False,
                                  bn=False)
         residual_output = input_data + short_cut
         residual_output = tf.nn.relu(residual_output)
 
     return residual_output
+
+
+def upsample(input_data, name, method="deconv"):
+    assert method in ["resize", "deconv"]
+
+    if method == "resize":
+        with tf.compat.v1.variable_scope(name):
+            input_shape = tf.shape(input_data)
+            output = tf.image.resize(input_data, (input_shape[1] * 2, input_shape[2] * 2), method="nearest")
+
+    if method == "deconv":
+        # replace resize_nearest_neighbor with conv2d_transpose To support TensorRT optimization
+        numm_filter = input_data.shape.as_list()[-1]
+        output = tf.layers.conv2d_transpose(input_data, numm_filter, kernel_size=2, padding='same',
+                                            strides=(2, 2), kernel_initializer=tf.random_normal_initializer())
+
+    return output
