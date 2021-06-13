@@ -1,130 +1,88 @@
 import tensorflow as tf
 
 
-def conv2d(input_data, filters_shape, trainable, name, downsample=False, activate=False, bn=False):
-    """
-    this is the traditional convolution
-    input_data:[batch size, rows,cols, channels]
-    ters_shape:[kernel_size,kernel_size,input_channel,output_channel]
-    """
-    with tf.compat.v1.variable_scope(name):
-        if downsample:
-            pad_h, pad_w = (filters_shape[0] - 2) // 2 + 1, (filters_shape[1] - 2) // 2 + 1
-            paddings = tf.constant([[0, 0], [pad_h, pad_h], [pad_w, pad_w], [0, 0]])
-            input_data = tf.pad(input_data, paddings, 'CONSTANT')
-            strides = (1, 2, 2, 1)
-            padding = 'VALID'
-        else:
-            strides = (1, 1, 1, 1)
-            padding = "SAME"
+class Conv_set(tf.keras.layers.Layer):
+    def __init__(self, filters, kernel_size, strides, groups=1):
+        super(Conv_set, self).__init__()
+        self.conv = tf.keras.layers.Conv2D(filters=filters,
+                                           kernel_size=kernel_size,
+                                           strides=strides,
+                                           padding="same", groups=groups)
+        self.bn = tf.keras.layers.BatchNormalization()
+        self.relu = tf.keras.layers.ReLU()
 
-        weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
-                             initial_value=tf.random.normal(filters_shape, stddev=0.01))
-        conv = tf.nn.conv2d(input=input_data, filters=weight, strides=strides, padding=padding)
-
+    def call(self, inputs, training=None, bn=True, activate=True, **kwargs):
+        x = self.conv(inputs)
         if bn:
-            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
-        else:
-            bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
-                               initial_value=tf.zeros(filters_shape[-1]))
-            conv = tf.nn.bias_add(conv, bias)
-
+            x = self.bn(x, training=training)
         if activate:
-            conv = tf.nn.relu(conv)
+            x = self.relu(x)
+        return x
 
-    return conv
 
-
-def conv_Depthwise_seperatable(input_data, filters_shape, trainable, name, downsample=False, activate=False, bn=False,
-                               pointwise=True):
-    """
-    this is the depthwise seperable convolution, block in figure 4(e)
-    """
-    with tf.compat.v1.variable_scope(name):
-        if downsample:
-            pad_h, pad_w = (filters_shape[0] - 2) // 2 + 1, (filters_shape[1] - 2) // 2 + 1
-            paddings = tf.constant([[0, 0], [pad_h, pad_h], [pad_w, pad_w], [0, 0]])
-            input_data = tf.pad(input_data, paddings, 'CONSTANT')
-            strides = (1, 2, 2, 1)
-            padding = 'VALID'
+class DW_conv(tf.keras.layers.Layer):
+    def __init__(self, kernel_size, strides):
+        super(DW_conv, self).__init__()
+        if strides != 1:
+            padding = "valid"
+            n=1
         else:
-            strides = (1, 1, 1, 1)
-            padding = "SAME"
-        output_channels = filters_shape[-1]
-        kernel_size = filters_shape[0]
-        filters_shape_dw = (kernel_size, kernel_size, input_data.shape[-1], 1)
-        weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape_dw,
-                             initial_value=tf.random.normal(filters_shape_dw, stddev=0.01))
-        conv = tf.nn.depthwise_conv2d(input=input_data, filter=weight, strides=strides, padding=padding)
+            padding = "same"
+            n=0
+        self.padding = tf.keras.layers.ZeroPadding2D(padding=((n,0),(n,0)))
+        self.conv = tf.keras.layers.DepthwiseConv2D(
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding)
+        self.bn = tf.keras.layers.BatchNormalization()
+        self.relu = tf.keras.layers.ReLU()
 
+    def call(self, inputs, training=None, bn=True, activate=True, **kwargs):
+        x= self.padding(inputs)
+        x = self.conv(x)
         if bn:
-            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
-        else:
-            bias = tf.Variable(name='bias', shape=filters_shape_dw[-2], trainable=True, dtype=tf.float32,
-                               initial_value=tf.zeros(filters_shape_dw[-2]))
-            conv = tf.nn.bias_add(conv, bias)
-
+            x = self.bn(x, training=training)
         if activate:
-            conv = tf.nn.relu(conv)
-        # point-wise convoluvtion + BN + relu
-        if pointwise:
-            conv = convPW(conv, output_channels, trainable, name, activate=True, bn=True)
-
-    return conv
+            x = self.relu(x)
+        return x
 
 
-def convPW(input_data, output_channels, trainable, name, activate=False, bn=False):
-    """
-    this is the pointwise convolution
-    """
-    with tf.compat.v1.variable_scope(name):
-        strides = (1, 1, 1, 1)
-        padding = "SAME"
-        filters_shape = (1, 1, input_data.shape[-1], output_channels)
-        weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
-                             initial_value=tf.random.normal(filters_shape, stddev=0.01))
-        conv = tf.nn.conv2d(input=input_data, filters=weight, strides=strides, padding=padding)
+class ResidualBlock(tf.keras.layers.Layer):
+    def __init__(self, filters1, filters2):
+        super(ResidualBlock, self).__init__()
+        self.conv1 = Conv_set(filters=filters1, kernel_size=(1, 1), strides=1, groups=4)
+        self.conv2 = DW_conv(kernel_size=(3, 3), strides=1)
+        self.conv3 = Conv_set(filters=filters2, kernel_size=(1, 1), strides=1, groups=4)
+        self.relu = tf.keras.layers.ReLU()
 
-        if bn:
-            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
-        else:
-            bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
-                               initial_value=tf.zeros(filters_shape[-1]))
-            conv = tf.nn.bias_add(conv, bias)
-
-        if activate:
-            conv = tf.nn.relu(conv)
-
-    return conv
+    def call(self, inputs, training=None, **kwargs):
+        x = self.conv1(inputs, training=training, bn=True, activation=True)
+        x = channel_shuffle(x)
+        x = self.conv2(x, training=training, bn=True, activate=False)
+        x = self.conv3(x, training=training, bn=False, activate=False)
+        x = tf.keras.layers.add([x, inputs])
+        x = self.relu(x)
+        return x
 
 
-def conPW_group(input_data, output_channels, trainable, name, group=4, activate=False, bn=False):
-    """
-    this is the pointwise convolution with group
-    """
-    with tf.compat.v1.variable_scope(name):
-        strides = (1, 1, 1, 1)
-        padding = "SAME"
-        filters_shape = (1, 1, int(input_data.shape[-1] / group), output_channels)
+def make_residual_block(filters1, filters2, num_blocks):
+    x = tf.keras.Sequential()
+    for _ in range(num_blocks):
+        x.add(ResidualBlock(filters1=filters1, filters2=filters2))
+    return x
 
-        weight = tf.Variable(name="weight", dtype=tf.float32, trainable=True, shape=filters_shape,
-                             initial_value=tf.random.normal(filters_shape, stddev=0.01))
-        input_groups = tf.split(value=input_data, num_or_size_splits=group, axis=3)
-        weight_groups = tf.split(value=weight, num_or_size_splits=group, axis=3)
-        groupConv = lambda i, k: tf.nn.conv2d(i, k, strides=strides, padding=padding)
-        conv = [groupConv(i, k) for i, k in zip(input_groups, weight_groups)]
-        conv = tf.concat(conv, axis=3)
-        if bn:
-            conv = tf.keras.layers.BatchNormalization(inputs=conv, trainable=trainable)
-        else:
-            bias = tf.Variable(name='bias', shape=filters_shape[-1], trainable=True, dtype=tf.float32,
-                               initial_value=tf.zeros(filters_shape[-1]))
-            conv = tf.nn.bias_add(conv, bias)
 
-        if activate:
-            conv = tf.nn.relu(conv)
+class DW_seperable_conv(tf.keras.layers.Layer):
+    def __init__(self, filters, kernel_size, strides):
+        super(DW_seperable_conv, self).__init__()
+        self.DW_conv = DW_conv(kernel_size=kernel_size,
+                               strides=strides)
+        self.PW_conv = Conv_set(filters=filters, kernel_size=(1, 1), strides=1)
 
-    return conv
+    def call(self, inputs, training=None, bn=True, activate=True, **kwargs):
+        x = self.DW_conv(inputs, training=training, bn=bn, activate=activate)
+        x = self.PW_conv(x, training=training, bn=bn, activate=activate)
+        return x
 
 
 def channel_shuffle(input_data, group=4):
@@ -135,27 +93,6 @@ def channel_shuffle(input_data, group=4):
     x = tf.transpose(x, perm=[0, 1, 2, 4, 3])
     x = tf.reshape(x, shape=(-1, input_data.shape[1], input_data.shape[2], channel_num))
     return x
-
-
-def residual_block(input_data, input_channel, filter_num1, filter_num2, filter_num3, trainable, name):
-    """
-    this is the network unit in figure 4(d) in paper
-    """
-    short_cut = input_data
-
-    with tf.compat.v1.variable_scope(name):
-        input_data = conPW_group(input_data, filter_num1, trainable=trainable, name='conv1', group=4, activate=True,
-                                 bn=True)
-        input_data = channel_shuffle(input_data)
-        input_data = conv_Depthwise_seperatable(input_data, filters_shape=(3, 3, input_channel, filter_num2),
-                                                trainable=trainable, name='conv2', bn=True, activate=False,
-                                                pointwise=False)
-        input_data = conPW_group(input_data, filter_num3, trainable=trainable, name='conv3', group=4, activate=False,
-                                 bn=False)
-        residual_output = input_data + short_cut
-        residual_output = tf.nn.relu(residual_output)
-
-    return residual_output
 
 
 def upsample(input_data, name, method="deconv"):
