@@ -25,11 +25,11 @@ class DW_conv(tf.keras.layers.Layer):
         super(DW_conv, self).__init__()
         if strides != 1:
             padding = "valid"
-            n=1
+            n = 1
         else:
             padding = "same"
-            n=0
-        self.padding = tf.keras.layers.ZeroPadding2D(padding=((n,0),(n,0)))
+            n = 0
+        self.padding = tf.keras.layers.ZeroPadding2D(padding=((n, 0), (n, 0)))
         self.conv = tf.keras.layers.DepthwiseConv2D(
             kernel_size=kernel_size,
             strides=strides,
@@ -38,7 +38,7 @@ class DW_conv(tf.keras.layers.Layer):
         self.relu = tf.keras.layers.ReLU()
 
     def call(self, inputs, training=None, bn=True, activate=True, **kwargs):
-        x= self.padding(inputs)
+        x = self.padding(inputs)
         x = self.conv(x)
         if bn:
             x = self.bn(x, training=training)
@@ -93,6 +93,3 @@ def channel_shuffle(input_data, group=4):
     x = tf.transpose(x, perm=[0, 1, 2, 4, 3])
     x = tf.reshape(x, shape=(-1, input_data.shape[1], input_data.shape[2], channel_num))
     return x
-
-
-

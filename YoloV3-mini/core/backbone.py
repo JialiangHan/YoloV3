@@ -31,5 +31,5 @@ class backbone(tf.keras.Model):
         x = self.conv6(output_2, training=None, bn=True, activate=True)
         x = self.residual5(x, training=training)
         output_3 = self.conv7(x, training=None, bn=False, activate=False)
-        print(output_3.shape, output_2.shape, output_1.shape)
+        # print(output_3.shape, output_2.shape, output_1.shape)
         return output_3, output_2, output_1

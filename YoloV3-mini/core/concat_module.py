@@ -59,5 +59,5 @@ class concat_module(tf.keras.Model):
         output_2, x = self.layer_2(input_2, x)
         x = self.layer_3(input_3, x)
         output_3 = self.conv(x)
-        print(output_1.shape, output_2.shape, output_3.shape)
+        # print(output_1.shape, output_2.shape, output_3.shape)
         return output_1, output_2, output_3
