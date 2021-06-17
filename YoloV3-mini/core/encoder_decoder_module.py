@@ -130,5 +130,5 @@ class encoder_decoder_module(tf.keras.Model):
         x = self.layer_3(x)
         output_1 = tf.add(output_1, x)
         output_1 = self.layer_4(output_1)
-        print(output_3.shape, output_2.shape, output_1.shape)
+        # print(output_3.shape, output_2.shape, output_1.shape)
         return output_3, output_2, output_1
