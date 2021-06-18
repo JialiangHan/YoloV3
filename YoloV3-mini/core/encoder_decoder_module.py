@@ -102,7 +102,7 @@ class encoder_decoder_layer_4(tf.keras.layers.Layer):
         return x
 
 
-class encoder_decoder_module(tf.keras.Model):
+class encoder_decoder_module(tf.keras.layers.Layer):
     def __init__(self):
         super(encoder_decoder_module, self).__init__()
         self.layer_1 = encoder_decoder_layer_1(filters=512, kernel_size=(3, 3), strides=2)

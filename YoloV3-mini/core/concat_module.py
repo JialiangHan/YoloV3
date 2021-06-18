@@ -46,7 +46,7 @@ class concat_layer_3(tf.keras.layers.Layer):
         return x
 
 
-class concat_module(tf.keras.Model):
+class concat_module(tf.keras.layers.Layer):
     def __init__(self):
         super(concat_module, self).__init__()
         self.layer_1 = concat_layer_1(filters=512, kernel_size=(1, 1), strides=1)
