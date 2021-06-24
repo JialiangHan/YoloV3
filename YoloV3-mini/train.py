@@ -97,7 +97,7 @@ def train_step(epoch, image_data, target):
         writer.flush()
 
 
-for epoch in range(cfg.load_weights_from_epoch + 1, cfg.TRAIN.EPOCHS):
+for epoch in range(load_weights_from_epoch + 1, cfg.TRAIN.EPOCHS):
     for image_data, target in trainset:
         train_step(epoch, image_data, target)
     # model.save_weights("./yolov3_mini/")
