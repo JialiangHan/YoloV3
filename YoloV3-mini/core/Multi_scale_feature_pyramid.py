@@ -5,7 +5,7 @@ from feature_fusion_module import feature_fusion
 from predict_set import predict_set
 
 
-class multi_scale_feature_pyramid(tf.keras.Model):
+class multi_scale_feature_pyramid(tf.keras.layers.Layer):
     def __init__(self,output_channels):
         super(multi_scale_feature_pyramid, self).__init__()
         self.concat = concat_module()

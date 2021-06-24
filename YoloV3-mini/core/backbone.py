@@ -2,7 +2,7 @@ import common
 import tensorflow as tf
 
 
-class backbone(tf.keras.Model):
+class backbone(tf.keras.layers.Layer):
     def __init__(self):
         super(backbone, self).__init__()
         self.conv1 = common.Conv_set(filters=32, kernel_size=(3, 3), strides=1)
