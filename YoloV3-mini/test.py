@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 # coding=utf-8
-#================================================================
+# ================================================================
 #   Copyright (C) 2019 * Ltd. All rights reserved.
 #
 #   Editor      : VIM
@@ -9,35 +9,39 @@
 #   Created date: 2019-07-19 10:29:34
 #   Description :
 #
-#================================================================
-
-import cv2
+# ================================================================
 import os
 import shutil
+
+import cv2
 import numpy as np
 import tensorflow as tf
+
 import core.utils as utils
+from YoloV3_mini import yolov3_mini
 from core.config import cfg
 from core.yolov3 import decode
-from YoloV3_mini import yolov3_mini
 
-INPUT_SIZE   = 416
-NUM_CLASS    = len(utils.read_class_names(cfg.YOLO.CLASSES))
-CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
+INPUT_SIZE = 416
+NUM_CLASS = len(utils.read_class_names(cfg.YOLO.CLASSES))
+CLASSES = utils.read_class_names(cfg.YOLO.CLASSES)
 
 predicted_dir_path = './mAP/predicted'
 ground_truth_dir_path = './mAP/ground-truth'
-if os.path.exists(predicted_dir_path): shutil.rmtree(predicted_dir_path)
-if os.path.exists(ground_truth_dir_path): shutil.rmtree(ground_truth_dir_path)
-if os.path.exists(cfg.TEST.DECTECTED_IMAGE_PATH): shutil.rmtree(cfg.TEST.DECTECTED_IMAGE_PATH)
+if os.path.exists(predicted_dir_path):
+    shutil.rmtree(predicted_dir_path)
+if os.path.exists(ground_truth_dir_path):
+    shutil.rmtree(ground_truth_dir_path)
+if os.path.exists(cfg.TEST.DECTECTED_IMAGE_PATH):
+    shutil.rmtree(cfg.TEST.DECTECTED_IMAGE_PATH)
 
 os.mkdir(predicted_dir_path)
 os.mkdir(ground_truth_dir_path)
 os.mkdir(cfg.TEST.DECTECTED_IMAGE_PATH)
 
 # Build Model
-input_layer  = tf.keras.layers.Input([INPUT_SIZE, INPUT_SIZE, 3])
-feature_maps = yolov3_mini(input_layer,3 * (NUM_CLASS + 5))
+input_layer = tf.keras.layers.Input([INPUT_SIZE, INPUT_SIZE, 3])
+feature_maps = yolov3_mini(input_layer, 3 * (NUM_CLASS + 5))
 bbox_tensors = []
 for i, fm in enumerate(feature_maps):
     bbox_tensor = decode(fm, i)
@@ -51,13 +55,14 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         annotation = line.strip().split()
         image_path = annotation[0]
         image_name = image_path.split('/')[-1]
+        t1 = cv2.getTickCount()
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
 
         if len(bbox_data_gt) == 0:
-            bboxes_gt=[]
-            classes_gt=[]
+            bboxes_gt = []
+            classes_gt = []
         else:
             bboxes_gt, classes_gt = bbox_data_gt[:, :4], bbox_data_gt[:, 4]
         ground_truth_path = os.path.join(ground_truth_dir_path, str(num) + '.txt')
@@ -84,11 +89,11 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         bboxes = utils.postprocess_boxes(pred_bbox, image_size, INPUT_SIZE, cfg.TEST.SCORE_THRESHOLD)
         bboxes = utils.nms(bboxes, cfg.TEST.IOU_THRESHOLD, method='nms')
 
-
         if cfg.TEST.DECTECTED_IMAGE_PATH is not None:
             image = utils.draw_bbox(image, bboxes)
-            cv2.imwrite(cfg.TEST.DECTECTED_IMAGE_PATH+image_name, image)
-
+            cv2.imwrite(cfg.TEST.DECTECTED_IMAGE_PATH + image_name, image)
+        t2 = cv2.getTickCount()
+        t = (t2 - t1) / cv2.getTickFrequency()
         with open(predict_result_path, 'w') as f:
             for bbox in bboxes:
                 coor = np.array(bbox[:4], dtype=np.int32)
@@ -100,4 +105,4 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
                 bbox_mess = ' '.join([class_name, score, xmin, ymin, xmax, ymax]) + '\n'
                 f.write(bbox_mess)
                 print('\t' + str(bbox_mess).strip())
-
+            print("time cost: %.4f seconds" % t)
