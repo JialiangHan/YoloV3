@@ -48,6 +48,7 @@ for i, fm in enumerate(feature_maps):
     bbox_tensors.append(bbox_tensor)
 
 model = tf.keras.Model(input_layer, bbox_tensors)
+
 model.load_weights(filepath=cfg.save_model_dir + "saved_model")
 
 with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
@@ -55,7 +56,7 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         annotation = line.strip().split()
         image_path = annotation[0]
         image_name = image_path.split('/')[-1]
-        t1 = cv2.getTickCount()
+
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
@@ -82,8 +83,10 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         image_size = image.shape[:2]
         image_data = utils.image_preporcess(np.copy(image), [INPUT_SIZE, INPUT_SIZE])
         image_data = image_data[np.newaxis, ...].astype(np.float32)
-
+        t1 = cv2.getTickCount()
         pred_bbox = model(image_data)
+        t2 = cv2.getTickCount()
+        t = (t2 - t1) / cv2.getTickFrequency()
         pred_bbox = [tf.reshape(x, (-1, tf.shape(x)[-1])) for x in pred_bbox]
         pred_bbox = tf.concat(pred_bbox, axis=0)
         bboxes = utils.postprocess_boxes(pred_bbox, image_size, INPUT_SIZE, cfg.TEST.SCORE_THRESHOLD)
@@ -92,8 +95,7 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         if cfg.TEST.DECTECTED_IMAGE_PATH is not None:
             image = utils.draw_bbox(image, bboxes)
             cv2.imwrite(cfg.TEST.DECTECTED_IMAGE_PATH + image_name, image)
-        t2 = cv2.getTickCount()
-        t = (t2 - t1) / cv2.getTickFrequency()
+
         with open(predict_result_path, 'w') as f:
             for bbox in bboxes:
                 coor = np.array(bbox[:4], dtype=np.int32)
@@ -106,3 +108,4 @@ with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
                 f.write(bbox_mess)
                 print('\t' + str(bbox_mess).strip())
             print("time cost: %.4f seconds" % t)
+model.summary()
